@@ -1,0 +1,9 @@
+{
+  "type": "papers",
+  "title": "Physics University 2024",
+  "subject": "Physics",
+  "branch": ["AIML", "CSE", "IOT", "IT", "CSIT"],
+  "semester": "2",
+  "year": "2024",
+  "paperType": "University"
+}
