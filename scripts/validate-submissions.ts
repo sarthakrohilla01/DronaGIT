@@ -2,6 +2,10 @@ import { readFileSync, existsSync, readdirSync } from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
+function isMissing(value: unknown): boolean {
+  return value === undefined || value === null || value === "";
+}
+
 export function validateSubmission(metadataPath: string): string[] {
   const errors: string[] = [];
   const dirPath = path.dirname(metadataPath);
@@ -22,17 +26,18 @@ export function validateSubmission(metadataPath: string): string[] {
 
   const validTypes = ["notes", "papers", "syllabus", "practicals"];
   const validPaperTypes = ["Sessional", "University", "Pre University", "Other"];
+  const validBranches = ["CSE", "AIML", "IOT", "IT", "CSIT", "ECE", "EEE", "ECS", "ME", "RA"];
   const minSem = 1;
   const maxSem = 8;
 
   const requiredFields = ["type", "title", "semester"];
   for (const field of requiredFields) {
-    if (!metadata[field]) {
+    if (isMissing(metadata[field])) {
       errors.push(`${prefix} Missing required field: '${field}'.`);
     }
   }
 
-  if (metadata.type) {
+  if (!isMissing(metadata.type)) {
     const typeLower = metadata.type.toLowerCase();
     if (metadata.type !== typeLower) {
       errors.push(`${prefix} 'type' must be lowercase. Got: '${metadata.type}'. Expected: '${typeLower}'.`);
@@ -42,44 +47,49 @@ export function validateSubmission(metadataPath: string): string[] {
     }
   }
 
-  if (metadata.type && metadata.type !== "syllabus" && !metadata.subject) {
+  if (!isMissing(metadata.type) && metadata.type !== "syllabus" && isMissing(metadata.subject)) {
     errors.push(`${prefix} Missing required field: 'subject' (required for type '${metadata.type}').`);
   }
 
-  if (metadata.type === "papers") {
-    if (!metadata.year) {
+  if (!isMissing(metadata.type) && metadata.type === "papers") {
+    if (isMissing(metadata.year)) {
       errors.push(`${prefix} Missing required field: 'year' (required for type 'papers').`);
     } else if (!/^\d{4}$/.test(String(metadata.year))) {
       errors.push(`${prefix} 'year' must be a 4-digit number. Got: '${metadata.year}'.`);
     }
 
-    if (metadata.paperType && !validPaperTypes.includes(metadata.paperType)) {
+    if (isMissing(metadata.paperType)) {
+      errors.push(`${prefix} Missing required field: 'paperType' (required for type 'papers').`);
+    } else if (!validPaperTypes.includes(metadata.paperType)) {
       errors.push(`${prefix} Invalid 'paperType': '${metadata.paperType}'. Must be one of: ${validPaperTypes.join(", ")}.`);
     }
   }
 
-  if (!metadata.branch || !Array.isArray(metadata.branch) || metadata.branch.length === 0) {
+  if (!Array.isArray(metadata.branch) || metadata.branch.length === 0) {
     errors.push(`${prefix} Missing required field: 'branch' (must be a non-empty array).`);
   } else {
     for (const b of metadata.branch) {
       if (typeof b !== "string" || b !== b.toUpperCase()) {
         errors.push(`${prefix} All 'branch' elements must be uppercase strings. Invalid element found: '${b}'.`);
+      } else if (!validBranches.includes(b)) {
+        errors.push(`${prefix} Invalid branch: '${b}'. Must be one of: ${validBranches.join(", ")}.`);
       }
     }
   }
 
-  if (metadata.semester) {
-    if (!/^\d+$/.test(String(metadata.semester))) {
-      errors.push(`${prefix} 'semester' must be a number. Got: '${metadata.semester}'.`);
+  if (!isMissing(metadata.semester)) {
+    const semStr = String(metadata.semester);
+    if (!/^\d+$/.test(semStr) || Number(metadata.semester) !== Math.floor(Number(metadata.semester))) {
+      errors.push(`${prefix} 'semester' must be a whole number. Got: '${metadata.semester}'.`);
     } else {
-      const semNum = parseInt(metadata.semester, 10);
+      const semNum = parseInt(semStr, 10);
       if (semNum < minSem || semNum > maxSem) {
         errors.push(`${prefix} 'semester' must be between ${minSem} and ${maxSem}. Got: '${metadata.semester}'.`);
       }
     }
   }
 
-  if (metadata.title && String(metadata.title).trim() === "") {
+  if (!isMissing(metadata.title) && String(metadata.title).trim() === "") {
     errors.push(`${prefix} 'title' must not be blank or whitespace-only.`);
   }
 

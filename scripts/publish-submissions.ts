@@ -6,6 +6,8 @@ const apiUrl = process.env.API_BASE_URL;
 const adminUsername = process.env.ADMIN_USERNAME;
 const adminPassword = process.env.ADMIN_PASSWORD;
 
+const SUBMISSIONS_ROOT = path.resolve(process.env.SUBMISSIONS_ROOT ?? "./submissions");
+
 if (!apiUrl || !adminUsername || !adminPassword) {
   console.error(
     "Missing API_BASE_URL, ADMIN_USERNAME, or ADMIN_PASSWORD environment variables!",
@@ -27,6 +29,15 @@ async function main() {
   }
 
   const dirPath = path.dirname(absoluteMetadataPath);
+
+  const resolvedDir = path.resolve(dirPath);
+  if (!resolvedDir.startsWith(SUBMISSIONS_ROOT + path.sep) && resolvedDir !== SUBMISSIONS_ROOT) {
+    console.error(
+      `Submission directory '${resolvedDir}' is outside the allowed submissions root '${SUBMISSIONS_ROOT}'. Aborting.`,
+    );
+    process.exit(1);
+  }
+
   console.log(`Processing submission in: ${dirPath}`);
 
   let metadata: any;
@@ -60,10 +71,8 @@ async function main() {
 
   try {
     console.log(`Authenticating as ${adminUsername}...`);
-    const safeApiUrl = apiUrl as string;
-    const baseUrl = safeApiUrl.endsWith("/")
-      ? safeApiUrl.slice(0, -1)
-      : safeApiUrl;
+
+    const baseUrl = (apiUrl as string).replace(/\/$/, "");
 
     const loginRes = await fetch(`${baseUrl}/api/auth/login`, {
       method: "POST",
@@ -75,7 +84,7 @@ async function main() {
     });
 
     if (!loginRes.ok) {
-      throw new Error(`Login failed: ${await loginRes.text()}`);
+      throw new Error(`Login failed (${loginRes.status}): ${await loginRes.text()}`);
     }
 
     const setCookieHeader = loginRes.headers.get("set-cookie");
@@ -90,14 +99,17 @@ async function main() {
     const form = new FormData();
     form.append("title", metadata.title);
     form.append("branch", JSON.stringify(metadata.branch));
-    form.append("semester", metadata.semester);
+    form.append("semester", String(metadata.semester));
     form.append("category", categoryName);
 
-    form.append("subject", metadata.subject || "");
+    if (metadata.subject) {
+      form.append("subject", metadata.subject);
+    }
+
 
     if (categoryName === "papers") {
-      form.append("type", metadata.paperType || "University");
-      form.append("year", metadata.year);
+      form.append("type", metadata.paperType);
+      form.append("year", String(metadata.year));
     }
 
     const fileBuffer = readFileSync(pdfFilePath);
@@ -114,7 +126,7 @@ async function main() {
     });
 
     if (!uploadRes.ok) {
-      throw new Error(`Upload failed: ${await uploadRes.text()}`);
+      throw new Error(`Upload failed (${uploadRes.status}): ${await uploadRes.text()}`);
     }
 
     const jsonRes = await uploadRes.json();
