@@ -99,6 +99,34 @@ Use the correct structure based on your resource type:
 
 ---
 
+### ✏️ Example — Edit Resource
+
+To edit a resource's metadata, use `"action": "edit"` and provide the `resourceId` along with the fields you want to update. **No PDF is required or allowed** for edits.
+
+```json
+{
+  "action": "edit",
+  "resourceId": "65ab...cdef",
+  "title": "Updated Data Structures Notes",
+  "semester": "4"
+}
+```
+
+---
+
+### 🗑️ Example — Delete Resource
+
+To delete a resource, use `"action": "delete"` and provide the `resourceId` you want to delete. **No PDF is required or allowed** for deletions.
+
+```json
+{
+  "action": "delete",
+  "resourceId": "65ab...cdef"
+}
+```
+
+---
+
 ### 6️⃣ Commit Your Changes
 
 ```bash

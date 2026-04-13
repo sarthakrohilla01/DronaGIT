@@ -27,7 +27,7 @@ function getAllMetadata(submissionsPath: string) {
           folder,
         });
       }
-    } catch {}
+    } catch { }
   }
 
   return results;
@@ -77,70 +77,143 @@ export function validateSubmission(metadataPath: string): string[] {
     "RA",
   ];
 
-  const requiredFields = ["type", "title", "subject", "branch", "semester"];
-  for (const field of requiredFields) {
-    if (isMissing(metadata[field])) {
-      errors.push(`${prefix} Missing required field: '${field}'.`);
+  const validActions = ["create", "edit", "delete"];
+  const actionLower = metadata.action ? String(metadata.action).trim().toLowerCase() : "create";
+
+  if (!validActions.includes(actionLower)) {
+    errors.push(`${prefix} Invalid 'action'. Must be one of: create, edit, delete.`);
+    return errors;
+  }
+
+  if (actionLower === "delete") {
+    if (isMissing(metadata.resourceId)) {
+      errors.push(`${prefix} Missing required field: 'resourceId' for delete action.`);
     }
   }
 
-  if (!isMissing(metadata.type)) {
-    const typeLower = metadata.type.toLowerCase();
-    if (metadata.type !== typeLower) {
-      errors.push(`${prefix} 'type' must be lowercase.`);
-    }
-    if (!validTypes.includes(typeLower)) {
-      errors.push(`${prefix} Invalid 'type'.`);
-    }
-  }
-
-  if (metadata.type === "papers") {
-    if (isMissing(metadata.year)) {
-      errors.push(`${prefix} Missing required field: 'year'.`);
-    } else if (!/^\d{4}$/.test(String(metadata.year))) {
-      errors.push(`${prefix} 'year' must be 4 digits.`);
+  if (actionLower === "edit") {
+    if (isMissing(metadata.resourceId)) {
+      errors.push(`${prefix} Missing required field: 'resourceId' for edit action.`);
     }
 
-    if (isMissing(metadata.paperType)) {
-      errors.push(`${prefix} Missing required field: 'paperType'.`);
-    } else if (!validPaperTypes.includes(metadata.paperType)) {
-      errors.push(`${prefix} Invalid 'paperType'.`);
-    }
-  }
-
-  if (!Array.isArray(metadata.branch) || metadata.branch.length === 0) {
-    errors.push(`${prefix} 'branch' must be a non-empty array.`);
-  } else {
-    for (const b of metadata.branch) {
-      if (typeof b !== "string" || b !== b.toUpperCase()) {
-        errors.push(`${prefix} Invalid branch format: '${b}'.`);
-      } else if (!validBranches.includes(b)) {
-        errors.push(`${prefix} Invalid branch: '${b}'.`);
+    if (!isMissing(metadata.type)) {
+      const typeLower = metadata.type.toLowerCase();
+      if (metadata.type !== typeLower) {
+        errors.push(`${prefix} 'type' must be lowercase.`);
+      }
+      if (!validTypes.includes(typeLower)) {
+        errors.push(`${prefix} Invalid 'type'.`);
       }
     }
-  }
 
-  if (!isMissing(metadata.semester)) {
-    const sem = Number(metadata.semester);
-    if (!Number.isInteger(sem) || sem < 1 || sem > 8) {
-      errors.push(`${prefix} 'semester' must be between 1 and 8.`);
+    if (metadata.type === "papers") {
+      if (!isMissing(metadata.year) && !/^\d{4}$/.test(String(metadata.year))) {
+        errors.push(`${prefix} 'year' must be 4 digits.`);
+      }
+      if (!isMissing(metadata.paperType) && !validPaperTypes.includes(metadata.paperType)) {
+        errors.push(`${prefix} Invalid 'paperType'.`);
+      }
+    }
+
+    if (!isMissing(metadata.branch)) {
+      if (!Array.isArray(metadata.branch) || metadata.branch.length === 0) {
+        errors.push(`${prefix} 'branch' must be a non-empty array.`);
+      } else {
+        for (const b of metadata.branch) {
+          if (typeof b !== "string" || b !== b.toUpperCase()) {
+            errors.push(`${prefix} Invalid branch format: '${b}'.`);
+          } else if (!validBranches.includes(b)) {
+            errors.push(`${prefix} Invalid branch: '${b}'.`);
+          }
+        }
+      }
+    }
+
+    if (!isMissing(metadata.semester)) {
+      const sem = Number(metadata.semester);
+      if (!Number.isInteger(sem) || sem < 1 || sem > 8) {
+        errors.push(`${prefix} 'semester' must be between 1 and 8.`);
+      }
+    }
+
+    if (!isMissing(metadata.title) && String(metadata.title).trim() === "") {
+      errors.push(`${prefix} 'title' must not be empty.`);
     }
   }
 
-  if (!isMissing(metadata.title) && String(metadata.title).trim() === "") {
-    errors.push(`${prefix} 'title' must not be empty.`);
+  if (actionLower === "create") {
+    const requiredFields = ["type", "title", "subject", "branch", "semester"];
+    for (const field of requiredFields) {
+      if (isMissing(metadata[field])) {
+        errors.push(`${prefix} Missing required field: '${field}'.`);
+      }
+    }
+
+    if (!isMissing(metadata.type)) {
+      const typeLower = metadata.type.toLowerCase();
+      if (metadata.type !== typeLower) {
+        errors.push(`${prefix} 'type' must be lowercase.`);
+      }
+      if (!validTypes.includes(typeLower)) {
+        errors.push(`${prefix} Invalid 'type'.`);
+      }
+    }
+
+    if (metadata.type === "papers") {
+      if (isMissing(metadata.year)) {
+        errors.push(`${prefix} Missing required field: 'year'.`);
+      } else if (!/^\d{4}$/.test(String(metadata.year))) {
+        errors.push(`${prefix} 'year' must be 4 digits.`);
+      }
+
+      if (isMissing(metadata.paperType)) {
+        errors.push(`${prefix} Missing required field: 'paperType'.`);
+      } else if (!validPaperTypes.includes(metadata.paperType)) {
+        errors.push(`${prefix} Invalid 'paperType'.`);
+      }
+    }
+
+    if (!isMissing(metadata.branch)) {
+      if (!Array.isArray(metadata.branch) || metadata.branch.length === 0) {
+        errors.push(`${prefix} 'branch' must be a non-empty array.`);
+      } else {
+        for (const b of metadata.branch) {
+          if (typeof b !== "string" || b !== b.toUpperCase()) {
+            errors.push(`${prefix} Invalid branch format: '${b}'.`);
+          } else if (!validBranches.includes(b)) {
+            errors.push(`${prefix} Invalid branch: '${b}'.`);
+          }
+        }
+      }
+    }
+
+    if (!isMissing(metadata.semester)) {
+      const sem = Number(metadata.semester);
+      if (!Number.isInteger(sem) || sem < 1 || sem > 8) {
+        errors.push(`${prefix} 'semester' must be between 1 and 8.`);
+      }
+    }
+
+    if (!isMissing(metadata.title) && String(metadata.title).trim() === "") {
+      errors.push(`${prefix} 'title' must not be empty.`);
+    }
   }
 
   try {
     const files = readdirSync(dirPath);
     const pdfs = files.filter((f) => f.toLowerCase().endsWith(".pdf"));
 
-    if (pdfs.length === 0) {
-      errors.push(`${prefix} No PDF found.`);
-    }
-
-    if (pdfs.length > 1) {
-      errors.push(`${prefix} Only one PDF allowed.`);
+    if (actionLower === "create") {
+      if (pdfs.length === 0) {
+        errors.push(`${prefix} No PDF found.`);
+      }
+      if (pdfs.length > 1) {
+        errors.push(`${prefix} Only one PDF allowed.`);
+      }
+    } else {
+      if (pdfs.length > 0) {
+        errors.push(`${prefix} PDFs are not allowed for '${actionLower}' actions.`);
+      }
     }
 
     const invalid = files.filter(
@@ -153,7 +226,7 @@ export function validateSubmission(metadataPath: string): string[] {
     errors.push(`${prefix} Cannot read folder.`);
   }
 
-  if (!isMissing(metadata.title) && !isMissing(metadata.subject)) {
+  if (actionLower === "create" && !isMissing(metadata.title) && !isMissing(metadata.subject)) {
     const all = getAllMetadata(submissionsPath);
     const currentTitle = String(metadata.title).trim().toLowerCase();
     const currentSubject = String(metadata.subject).trim().toLowerCase();

@@ -40,10 +40,10 @@ jobs:
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
-          files='${{ steps.changed-files.outputs.all_changed_files }}'
           # Strip the backslash escapes that GitHub Actions injects
-          clean=$(echo "$files" | sed 's/\\"/"/g')
+          clean=$(echo "$CHANGED_FILES" | sed 's/\\"/"/g')
           echo "$clean" | jq -r '.[]' | while IFS= read -r file; do
             [ -z "$file" ] && continue
             echo "Processing submission: $file"

@@ -57,17 +57,18 @@ async function main() {
     process.exit(1);
   }
 
-  const categoryName = metadata.type.toLowerCase();
+  const action = metadata.action ? String(metadata.action).trim().toLowerCase() : "create";
 
-  const filesInDir = readdirSync(dirPath);
-  const pdfFileName = filesInDir.find((f) => f.toLowerCase().endsWith(".pdf"));
+  let pdfFileName: string | undefined;
+  if (action === "create") {
+    const filesInDir = readdirSync(dirPath);
+    pdfFileName = filesInDir.find((f) => f.toLowerCase().endsWith(".pdf"));
 
-  if (!pdfFileName) {
-    console.error("No PDF file found in the submission directory.");
-    process.exit(1);
+    if (!pdfFileName) {
+      console.error("No PDF file found in the submission directory.");
+      process.exit(1);
+    }
   }
-
-  const pdfFilePath = path.join(dirPath, pdfFileName);
 
   try {
     console.log(`Authenticating as ${adminUsername}...`);
@@ -94,43 +95,86 @@ async function main() {
 
     const authCookie = setCookieHeader.split(";")[0];
 
-    console.log(`Preparing upload for ${pdfFileName}...`);
+    if (action === "delete") {
+      console.log(`Deleting resource ${metadata.resourceId}...`);
+      const deleteRes = await fetch(`${baseUrl}/api/admin/resource/${metadata.resourceId}`, {
+        method: "DELETE",
+        headers: {
+          Cookie: authCookie,
+        },
+      });
 
-    const form = new FormData();
-    form.append("title", metadata.title);
-    form.append("branch", JSON.stringify(metadata.branch));
-    form.append("semester", String(metadata.semester));
-    form.append("category", categoryName);
+      if (!deleteRes.ok) {
+        throw new Error(`Delete failed (${deleteRes.status}): ${await deleteRes.text()}`);
+      }
 
-    if (metadata.subject) {
-      form.append("subject", metadata.subject);
+      console.log(`Successfully deleted record ID:`, metadata.resourceId);
+    } else if (action === "edit") {
+      console.log(`Updating resource ${metadata.resourceId}...`);
+      
+      const payload: any = {};
+      if (metadata.title) payload.title = metadata.title;
+      if (metadata.subject) payload.subject = metadata.subject;
+      if (metadata.branch) payload.branch = metadata.branch;
+      if (metadata.semester) payload.semester = String(metadata.semester);
+      if (metadata.type) payload.category = metadata.type.toLowerCase();
+      if (metadata.paperType) payload.type = metadata.paperType;
+      if (metadata.year) payload.year = String(metadata.year);
+
+      const putRes = await fetch(`${baseUrl}/api/admin/resource/${metadata.resourceId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: authCookie,
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!putRes.ok) {
+        throw new Error(`Update failed (${putRes.status}): ${await putRes.text()}`);
+      }
+
+      console.log(`Successfully updated record ID:`, metadata.resourceId);
+    } else {
+      console.log(`Preparing upload for ${pdfFileName}...`);
+      const categoryName = metadata.type.toLowerCase();
+
+      const form = new FormData();
+      form.append("title", metadata.title);
+      form.append("branch", JSON.stringify(metadata.branch));
+      form.append("semester", String(metadata.semester));
+      form.append("category", categoryName);
+
+      if (metadata.subject) {
+        form.append("subject", metadata.subject);
+      }
+
+      if (categoryName === "papers") {
+        form.append("type", metadata.paperType);
+        form.append("year", String(metadata.year));
+      }
+
+      const pdfFilePath = path.join(dirPath, pdfFileName!);
+      const fileBuffer = readFileSync(pdfFilePath);
+      const blob = new Blob([fileBuffer], { type: "application/pdf" });
+      form.append("file", blob, pdfFileName!);
+
+      console.log(`Uploading to ${baseUrl}/api/admin/upload...`);
+      const uploadRes = await fetch(`${baseUrl}/api/admin/upload`, {
+        method: "POST",
+        headers: {
+          Cookie: authCookie,
+        },
+        body: form,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error(`Upload failed (${uploadRes.status}): ${await uploadRes.text()}`);
+      }
+
+      const jsonRes = await uploadRes.json();
+      console.log(`Successfully uploaded and created record ID:`, jsonRes._id);
     }
-
-
-    if (categoryName === "papers") {
-      form.append("type", metadata.paperType);
-      form.append("year", String(metadata.year));
-    }
-
-    const fileBuffer = readFileSync(pdfFilePath);
-    const blob = new Blob([fileBuffer], { type: "application/pdf" });
-    form.append("file", blob, pdfFileName);
-
-    console.log(`Uploading to ${baseUrl}/api/admin/upload...`);
-    const uploadRes = await fetch(`${baseUrl}/api/admin/upload`, {
-      method: "POST",
-      headers: {
-        Cookie: authCookie,
-      },
-      body: form,
-    });
-
-    if (!uploadRes.ok) {
-      throw new Error(`Upload failed (${uploadRes.status}): ${await uploadRes.text()}`);
-    }
-
-    const jsonRes = await uploadRes.json();
-    console.log(`Successfully uploaded and created record ID:`, jsonRes._id);
 
     console.log(`Cleaning up submission directory: ${dirPath}...`);
     rmSync(dirPath, { recursive: true, force: true });
